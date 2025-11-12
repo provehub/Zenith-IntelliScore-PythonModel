@@ -14,6 +14,39 @@ LOW_PD = float(os.getenv("LOW_PD", "0.07"))
 MED_PD = float(os.getenv("MED_PD", "0.15"))
 HI_PD = float(os.getenv("HI_PD", "0.30"))
 
+# -------- Load artifacts once
+model = joblib.load(MODEL_PATH)
+explainer = joblib.load(EXPLAINER_PATH)
+feature_names: List[str] = joblib.load(FEATURES_PATH)
+MODEL_VERSION = os.getenv("MODEL_VERSION", "gbm-2025-11-10")
+
+# -------- Schemas
+class FeatureVector(BaseModel):
+    tel_topups_cnt_90d: conint(ge=0) = 0
+    tel_inactive_days_90d: conint(ge=0) = 0
+    util_late_cnt_90d: conint(ge=0) = 0
+    pos_txn_cnt_90d: conint(ge=0) = 0
+    pos_volume_90d_ngn: confloat(ge=0) = 0.0
+    salary_inflow_90d_ngn: confloat(ge=0) = 0.0
+    net_inflow_90d_ngn: float = 0.0
+    age_years: conint(ge=18, le=90) = 32
+
+class ScoreRequest(BaseModel):
+    features: FeatureVector
+    application_id: str | None = None
+    customer_id: str | None = None
+
+class BatchScoreRequest(BaseModel):
+    items: List[ScoreRequest]
+
+class ScoreResponse(BaseModel):
+    credit_trust_score: conint(ge=0, le=SCORE_SCALE)
+    pd_90d: confloat(ge=0.0, le=1.0)
+    risk_band: Literal["A","B","C","D"]
+    top_feature_impacts: List[Dict[str, Any]]
+    model_version: str
+    
+# start below Francis 
 app = FastAPI(title="Zenith IntelliScore API")
 
 model = joblib.load("model.pkl")
